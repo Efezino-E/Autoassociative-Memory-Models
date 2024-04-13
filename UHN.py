@@ -32,6 +32,9 @@ class UHNModel:
         else:
             # Not yet created iterator types
             raise ValueError("Iterator types not yet defined")
+    
+    def type(self):
+        return self.similarity.name + " " + self.separator.name + " " + self.projection.name
         
 # Similarity classes
 class manhattan():
@@ -49,31 +52,75 @@ class manhattan():
     def flow(self, input_data):
 
         # Raise value error for incompatible dimensions
-        if self.data.shape[0] != input_data.shape[0]:
+        if self.data.shape[1] != input_data.shape[0]:
             raise ValueError("Input data and Stored memory not of the same dimensions")
         
         # Build similarity matrix
         similarity_matrix = []
         for point in self.data:
-            similarity_matrix.append(abs(point - input_data).sum())
+            diff = abs(point - input_data)
+            similarity_matrix.append(1 / diff[np.logical_not(np.isnan(diff))].sum())
         
         similarity_matrix =  np.array(similarity_matrix)
-        maxi = max(similarity_matrix)
-        similarity_matrix = maxi - similarity_matrix
+
+        if np.inf in similarity_matrix:
+            temp = np.array([0] * len(similarity_matrix))
+            temp[np.argmax(similarity_matrix)] = 100
+            similarity_matrix = temp
         
         if self.show_progress:
             print(f"{self.name} similarity flow complete")
 
         return similarity_matrix
+    
+    def type(self):
+        return self.name
+
+class euclidean():
+    def __init__(self, show_progress: bool = False) -> None:
+        self.name = "Euclidean"
+        self.show_progress = show_progress
+        self.data = None
+
+    def fit(self, data_patterns):
+        # store data patterns
+        self.data = data_patterns
+        if self.show_progress:
+            print(f"data stored for {self.name} separator")
+        
+    def flow(self, input_data):
+
+        # Raise value error for incompatible dimensions
+        if self.data.shape[1] != input_data.shape[0]:
+            raise ValueError("Input data and Stored memory not of the same dimensions")
+        
+        # Build similarity matrix
+        similarity_matrix = []
+        for point in self.data:
+            diff = (point - input_data) ** 2
+            similarity_matrix.append(1 / diff[np.logical_not(np.isnan(diff))].sum())
+        
+        similarity_matrix =  np.array(similarity_matrix)
+
+        if np.inf in similarity_matrix:
+            temp = np.array([0] * len(similarity_matrix))
+            temp[np.argmax(similarity_matrix)] = 100
+            similarity_matrix = temp
+        
+        if self.show_progress:
+            print(f"{self.name} similarity flow complete")
+
+        return similarity_matrix
+    
+    def type(self):
+        return self.name
 
 # Separator classes
 class softmax():
-    
-    def __init__(self, show_progress: bool = False, invert_probabilities: bool = False) -> None:
+    def __init__(self, show_progress: bool = False) -> None:
         self.name = "Softmax"
         self.show_progress = show_progress
         self.exponent = 2.71828
-        self.invert_probabilities = invert_probabilities
 
     def fit(self, data):
         return None
@@ -88,6 +135,97 @@ class softmax():
             print(f"{self.name} separator flow complete")
         
         return probabilities
+    
+    def type(self):
+        return self.name
+    
+class max():
+    def __init__(self, show_progress: bool = False) -> None:
+        self.name = "Max"
+        self.show_progress = show_progress
+
+    def fit(self, data):
+        return None
+
+    def flow(self, similarity_matrix):
+        # Apply the softmax function to the similarity matrix
+        
+        probabilities = np.array([0] * len(similarity_matrix))
+        probabilities[np.argmax(similarity_matrix)] = 1
+        
+        if self.show_progress:
+            print(f"{self.name} separator flow complete")
+        
+        return probabilities
+    
+    def type(self):
+        return self.name
+    
+class polynomial_10():
+    def __init__(self, show_progress: bool = False) -> None:
+        self.name = "10th Order Polynomial"
+        self.show_progress = show_progress
+
+    def fit(self, data):
+        return None
+
+    def flow(self, similarity_matrix):
+        # Apply the softmax function to the similarity matrix
+        
+        probabilities = (similarity_matrix ** 10)
+        probabilities = probabilities / probabilities.sum()
+        
+        if self.show_progress:
+            print(f"{self.name} separator flow complete")
+        
+        return probabilities
+    
+    def type(self):
+        return self.name
+    
+class polynomial_5():
+    def __init__(self, show_progress: bool = False) -> None:
+        self.name = "5th Order Polynomial"
+        self.show_progress = show_progress
+
+    def fit(self, data):
+        return None
+
+    def flow(self, similarity_matrix):
+        # Apply the softmax function to the similarity matrix
+        
+        probabilities = (similarity_matrix ** 5)
+        probabilities = probabilities / probabilities.sum()
+        
+        if self.show_progress:
+            print(f"{self.name} separator flow complete")
+        
+        return probabilities
+    
+    def type(self):
+        return self.name
+    
+class polynomial_2():
+    def __init__(self, show_progress: bool = False) -> None:
+        self.name = "2nd Order Polynomial"
+        self.show_progress = show_progress
+
+    def fit(self, data):
+        return None
+
+    def flow(self, similarity_matrix):
+        # Apply the softmax function to the similarity matrix
+        
+        probabilities = (similarity_matrix ** 2)
+        probabilities = probabilities / probabilities.sum()
+        
+        if self.show_progress:
+            print(f"{self.name} separator flow complete")
+        
+        return probabilities
+    
+    def type(self):
+        return self.name
 
 
 # Projection classes
@@ -112,3 +250,6 @@ class weighted_sum():
             print(f"{self.name} projection applied")
             
         return output
+    
+    def type(self):
+        return self.name
