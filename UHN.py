@@ -1,255 +1,155 @@
-# Work in progress
-# --- to be better structured as an Object oriented class
-# --- to involve more similarity, separator and projection functions
-# --- to implement iterators
-
 import numpy as np
 
-class UHNModel:
+# === UHN MODEL CLASS 
+
+class UHN_model:
     
-    def __init__(self, similarity = None, separator = None, projection = None, iterator = None, quiet = True) -> None:
-        # Instantiate with the similarity, separator, projector and iterator classes to use for the UHN model
-        self.similarity = similarity(show_progress = not quiet)
-        self.separator = separator(show_progress = not quiet)
-        self.projection = projection(show_progress = not quiet)
-        self.iterator = iterator
-    
-    def fit(self, data):
-        # Fit the similarity, separator and projection functions based on the data
-        self.similarity.fit(data)
-        self.separator.fit(data)
-        self.projection.fit(data)
-    
-    def query(self, input_data):
+    def __init__(self, similarity, separator, projection):
+        """
+        Creates a Unified Hopfield Model with a predefined similarity, separator and projection function
+        """
+        # instantiate model with the similarity, spearator and projector functions
+        self.similarity = similarity
+        self.separator = separator
+        self.projection = projection
 
-        if not self.iterator:
-            # flow the input through the framework's pipeline
-            out1 = self.similarity.flow(input_data)
-            out2 = self.separator.flow(out1)
-            out3 = self.projection.flow(out2)
-            return out3 
-        
-        else:
-            # Not yet created iterator types
-            raise ValueError("Iterator types not yet defined")
-    
-    def type(self):
-        return self.similarity.name + " " + self.separator.name + " " + self.projection.name
-        
-# Similarity classes
-class manhattan():
-    def __init__(self, show_progress: bool = False) -> None:
-        self.name = "Manhattan"
-        self.show_progress = show_progress
-        self.data = None
+    def fit(self, input_data, output_data): # might be unecessary to the package at this moment
+        """
+        Stores or trains the Unified Hopfiled model based on the input and output data pair.
+        """
+        # convert data type to numpy arrays
+        input_data = np.array(input_data)
+        output_data = np.array(output_data)
 
-    def fit(self, data_patterns):
-        # store data patterns
-        self.data = data_patterns
-        if self.show_progress:
-            print(f"data stored for {self.name} separator")
-        
-    def flow(self, input_data):
+        # raise error if input - output data associations are not complete
+        if input_data.shape[0] != output_data.shape[0]:
+            raise ValueError("Input and Output data not of the same dimensions. There are inputs not associated with outputs or vice versa")
 
-        # Raise value error for incompatible dimensions
-        if self.data.shape[1] != input_data.shape[0]:
-            raise ValueError("Input data and Stored memory not of the same dimensions")
-        
-        # Build similarity matrix
-        similarity_matrix = []
-        for point in self.data:
-            diff = abs(point - input_data)
-            similarity_matrix.append(1 / diff[np.logical_not(np.isnan(diff))].sum())
-        
-        similarity_matrix =  np.array(similarity_matrix)
+        # store the data
+        self.input_data = input_data
+        self.output_data = output_data
 
-        if np.inf in similarity_matrix:
-            temp = np.array([0] * len(similarity_matrix))
-            temp[np.argmax(similarity_matrix)] = 100
-            similarity_matrix = temp
-        
-        if self.show_progress:
-            print(f"{self.name} similarity flow complete")
+    def predict(self, input):
+        """
+        Returns data that the Unified Hopfield Network associates with the input data.
+        """
+        # convert the input to a numpy array
+        input = np.array(input)
 
-        return similarity_matrix
-    
-    def type(self):
-        return self.name
+        # first: calculate the similarity of the input to each input data stored
+        num_patterns = self.input_data.shape[0]
+        output = [0] * num_patterns
 
-class euclidean():
-    def __init__(self, show_progress: bool = False) -> None:
-        self.name = "Euclidean"
-        self.show_progress = show_progress
-        self.data = None
+        for i in range(num_patterns):
+            output[i] = self.similarity(input, self.input_data[i])
+        
+        output = np.array(output)
 
-    def fit(self, data_patterns):
-        # store data patterns
-        self.data = data_patterns
-        if self.show_progress:
-            print(f"data stored for {self.name} separator")
-        
-    def flow(self, input_data):
+        # second: apply the separator function to magnify differences in the similarity vector
+        output = self.separator(output)
 
-        # Raise value error for incompatible dimensions
-        if self.data.shape[1] != input_data.shape[0]:
-            raise ValueError("Input data and Stored memory not of the same dimensions")
-        
-        # Build similarity matrix
-        similarity_matrix = []
-        for point in self.data:
-            diff = (point - input_data) ** 2
-            similarity_matrix.append(1 / diff[np.logical_not(np.isnan(diff))].sum())
-        
-        similarity_matrix =  np.array(similarity_matrix)
+        # third: apply the projection function to create a final output based on the input output association
+        output = self.projection(output, self.output_data)
 
-        if np.inf in similarity_matrix:
-            temp = np.array([0] * len(similarity_matrix))
-            temp[np.argmax(similarity_matrix)] = 100
-            similarity_matrix = temp
-        
-        if self.show_progress:
-            print(f"{self.name} similarity flow complete")
-
-        return similarity_matrix
-    
-    def type(self):
-        return self.name
-
-# Separator classes
-class softmax():
-    def __init__(self, show_progress: bool = False) -> None:
-        self.name = "Softmax"
-        self.show_progress = show_progress
-        self.exponent = 2.71828
-
-    def fit(self, data):
-        return None
-
-    def flow(self, similarity_matrix):
-        # Apply the softmax function to the similarity matrix
-        
-        exponents = self.exponent ** similarity_matrix
-        probabilities = ((exponents) / exponents.sum())
-        
-        if self.show_progress:
-            print(f"{self.name} separator flow complete")
-        
-        return probabilities
-    
-    def type(self):
-        return self.name
-    
-class max():
-    def __init__(self, show_progress: bool = False) -> None:
-        self.name = "Max"
-        self.show_progress = show_progress
-
-    def fit(self, data):
-        return None
-
-    def flow(self, similarity_matrix):
-        # Apply the softmax function to the similarity matrix
-        
-        probabilities = np.array([0] * len(similarity_matrix))
-        probabilities[np.argmax(similarity_matrix)] = 1
-        
-        if self.show_progress:
-            print(f"{self.name} separator flow complete")
-        
-        return probabilities
-    
-    def type(self):
-        return self.name
-    
-class polynomial_10():
-    def __init__(self, show_progress: bool = False) -> None:
-        self.name = "10th Order Polynomial"
-        self.show_progress = show_progress
-
-    def fit(self, data):
-        return None
-
-    def flow(self, similarity_matrix):
-        # Apply the softmax function to the similarity matrix
-        
-        probabilities = (similarity_matrix ** 10)
-        probabilities = probabilities / probabilities.sum()
-        
-        if self.show_progress:
-            print(f"{self.name} separator flow complete")
-        
-        return probabilities
-    
-    def type(self):
-        return self.name
-    
-class polynomial_5():
-    def __init__(self, show_progress: bool = False) -> None:
-        self.name = "5th Order Polynomial"
-        self.show_progress = show_progress
-
-    def fit(self, data):
-        return None
-
-    def flow(self, similarity_matrix):
-        # Apply the softmax function to the similarity matrix
-        
-        probabilities = (similarity_matrix ** 5)
-        probabilities = probabilities / probabilities.sum()
-        
-        if self.show_progress:
-            print(f"{self.name} separator flow complete")
-        
-        return probabilities
-    
-    def type(self):
-        return self.name
-    
-class polynomial_2():
-    def __init__(self, show_progress: bool = False) -> None:
-        self.name = "2nd Order Polynomial"
-        self.show_progress = show_progress
-
-    def fit(self, data):
-        return None
-
-    def flow(self, similarity_matrix):
-        # Apply the softmax function to the similarity matrix
-        
-        probabilities = (similarity_matrix ** 2)
-        probabilities = probabilities / probabilities.sum()
-        
-        if self.show_progress:
-            print(f"{self.name} separator flow complete")
-        
-        return probabilities
-    
-    def type(self):
-        return self.name
-
-
-# Projection classes
-class weighted_sum():
-    
-    def __init__(self, show_progress: bool = False) -> None:
-        self.name = "Weighted Sum"
-        self.show_progress = show_progress
-    
-    def fit(self, data_patterns):
-        self.data = np.transpose(data_patterns)
-        if self.show_progress:
-            print(f"data stored for {self.name} projection")
-    
-    def flow(self, similarity_matrix):
-        output = []
-
-        for val in range(self.data.shape[0]):
-            output.append(np.dot(similarity_matrix, self.data[val]))
-        
-        if self.show_progress:
-            print(f"{self.name} projection applied")
-            
         return output
+
+    def structure(self):
+        return (self.similarity, self.separator, self.projection)
+
+# === PREDEFINED SIMILARITY FUNCTIONS ===
+
+def manhattan(vector1, vector2):
+    """
+    calculates the multiplicative inverse of the manhattan distance between two vectors
+    """
+    distance = np.sum(np.abs(vector1 - vector2))
+
+    if distance == 0:
+        return np.inf
+    else:
+        return 1 / distance
     
-    def type(self):
-        return self.name
+def euclidean(vector1, vector2):
+    """
+    calculates the multiplicative inverse of the euclidean distance between two vectors
+    """
+    distance = np.sum((vector1 - vector2) ** 2)
+
+    if distance == 0:
+        return np.inf
+    else:
+        return 1 / distance
+    
+def cosineSimilarity(vector1, vector2):
+    """
+    calculates the cosine similarity between two vectors
+    """
+    distance = np.arccos(np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2)))
+
+    if distance == 0:
+        return np.inf
+    else:
+        return 1 / distance
+
+# === PREDEFINED SEPRATOR FUNCTIONS ===
+
+def softMax(vector):
+    """
+    Exponentially magnifies the difference between components of the input vector.
+    Further scales the vector such that it's components sum up to 1
+    """
+    # If one or more components are infinite, sclae the first infinite component to 1 and the rest to zero
+    for i in range(len(vector)):
+        if vector[i] == np.inf:
+            vector = [0] * len(vector)
+            vector[i] = 1
+            return np.array(vector)
+        
+    vector = np.exp(vector)
+    vector = vector / np.sum(vector)
+    return vector
+
+def Max(vector):
+    """
+    Finds the maximum value of the vector's component
+    changes the first occurence of this vector to 1
+    and the other components to zero
+    """
+    max_index = vector.argmax()
+    vector = np.zeros(len(vector))
+    vector[max_index] = 1
+    return vector
+
+def nthPolynomial(n):
+    """
+    Magnifies the differences between components of a vector using a polynomial function of order n.
+    Further scales the vector such that it's components sum up to 1
+    """
+    def polynomial(vector, exponent = n):
+        # If one or more components are infinite, sclae the first infinite component to 1 and the rest to zero
+        for i in range(len(vector)):
+            if vector[i] == np.inf:
+                vector = [0] * len(vector)
+                vector[i] = 1
+                return np.array(vector)
+        vector = vector ** exponent
+        vector = vector / np.sum(vector)
+        return vector
+
+    return polynomial
+
+
+# === PREDEFINED PROJECTION FUNCTIONS ===
+
+def weightedSum(weights, output_data):
+    """
+    Calculates a weighted sum of different outputs contained within the output data. the 
+    """
+    values = np.transpose(output_data)
+    dimension = values.shape[0]
+    output = [0] * dimension
+
+    for i in range(dimension):
+        output[i] = np.dot(weights, values[i])
+    
+    return output
